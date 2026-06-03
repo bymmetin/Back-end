@@ -40,4 +40,21 @@ export class AuthService {
     const token = this.jwt.sign({ sub: userId, email });
     return { access_token: token, user: { id: userId, email, ...profile } };
   }
+
+  async getProfile(userId: string) {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('profiles')
+      .select('id, username, xp, streak')
+      .eq('id', userId)
+      .single();
+
+    if (error) throw new UnauthorizedException('Profil bulunamadı');
+    return data;
+  }
+
+  async logout(userId: string) {
+    await this.supabase.getClient().auth.signOut();
+    return { success: true, message: 'Çıkış yapıldı' };
+  }
 }
