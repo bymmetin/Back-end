@@ -1,155 +1,98 @@
-# 🗄️ Mnemo — Veritabanı Katmanı (Back-end)
+<p align="center">
+  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+</p>
 
-Mnemo uygulamasının Supabase/PostgreSQL tabanlı bulut veritabanı şeması ve örnek veri seti.
+[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
+[circleci-url]: https://circleci.com/gh/nestjs/nest
 
-## 📐 Veri Modeli
+  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
+    <p align="center">
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
+<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
+<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
+<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
+<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
+  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
+    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
+  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+</p>
+  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
+  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-```
-topics  (Üniteler)
- └── lessons  (Aşamalar)
-       └── questions  (Sorular)
-```
+## Description
 
-Silme işlemleri CASCADE — bir ünite silinirse bağlı tüm aşama ve sorular da otomatik silinir.
+[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
----
+## Project setup
 
-## 🗂️ Tablo Detayları
-
-### `topics` — Üniteler
-| Sütun | Tip | Açıklama |
-|---|---|---|
-| `id` | BIGINT | Otomatik artan birincil anahtar |
-| `title` | TEXT | Ünite adı (ör: "Osmanlı Kuruluş Dönemi") |
-| `description` | TEXT | Kısa açıklama (opsiyonel) |
-| `order_num` | INTEGER | Gösterim sırası — küçük numara üstte gösterilir |
-
-### `lessons` — Aşamalar
-| Sütun | Tip | Açıklama |
-|---|---|---|
-| `id` | BIGINT | Otomatik artan birincil anahtar |
-| `topic_id` | BIGINT | Bağlı ünite → `topics.id` (CASCADE DELETE) |
-| `title` | TEXT | Aşama adı (ör: "İstanbul'un Fethi") |
-| `order_num` | INTEGER | Ünite içindeki sıra |
-
-> **Not:** Aşaması olmayan üniteler uygulamada gösterilmez.
-
-### `questions` — Sorular
-| Sütun | Tip | Açıklama |
-|---|---|---|
-| `id` | BIGINT | Otomatik artan birincil anahtar |
-| `lesson_id` | BIGINT | Bağlı aşama → `lessons.id` (CASCADE DELETE) |
-| `question_text` | TEXT | Soru metni veya bilgi kartı içeriği |
-| `question_type` | TEXT | `multiple_choice` \| `matching` \| `fill_blank` (varsayılan: `multiple_choice`) |
-| `option_a` – `option_d` | TEXT | Çoktan seçmeli şıklar (opsiyonel) |
-| `correct_answer` | TEXT | Doğru cevap — çoktan seçmeli için `"A"/"B"/"C"/"D"` |
-| `extra_data` | TEXT | JSON string — eşleştirme çiftleri için kullanılır (opsiyonel) |
-| `image_url` | TEXT | Görselli sorular için tam URL (opsiyonel) |
-| `audio_url` | TEXT | Sesli sorular için tam URL (opsiyonel) |
-
----
-
-## 📁 Dosyalar
-
-| Dosya | İçerik |
-|---|---|
-| `schema.sql` | Tablo oluşturma, RLS politikaları ve yetkilendirme |
-| `seed.sql` | Örnek veriler — Osmanlı tarihi ve I. Dünya Savaşı konuları |
-
----
-
-## 🚀 Kurulum
-
-### 1. Supabase Projesi Oluştur
-[supabase.com](https://supabase.com) → **New Project** → Bölge: **Europe (Frankfurt)** önerilir.
-
-### 2. SQL Dosyalarını Sırayla Çalıştır
-
-Dashboard → **SQL Editor** sekmesine git:
-
-```
-Adım 1: schema.sql içeriğini yapıştır → Run
-Adım 2: seed.sql  içeriğini yapıştır → Run
+```bash
+$ npm install
 ```
 
-> ⚠️ `seed.sql` dosyası `TRUNCATE` ile başlar — çalıştırmadan önce mevcut verileri yedekle.
+## Compile and run the project
 
-### 3. API Bilgilerini Al
+```bash
+# development
+$ npm run start
 
-**Project Settings → API** bölümünden:
-- `Project URL` → `SUPABASE_URL`
-- `anon public` key → `SUPABASE_KEY`
+# watch mode
+$ npm run start:dev
 
-Bu değerleri mobil uygulamanın `src/config/supabase.js` dosyasına gir.
-
----
-
-## 🔒 Güvenlik (Row Level Security)
-
-Tüm tablolarda RLS aktiftir:
-
-| İşlem | Yetkili |
-|---|---|
-| `SELECT` (okuma) | Herkes — anonim kullanıcılar dahil |
-| `INSERT / UPDATE / DELETE` | Yalnızca Supabase Dashboard |
-
-Uygulama yalnızca okuma yapar; içerik yönetimi tamamen Dashboard üzerinden yapılır.
-
----
-
-## 📝 Soru Tipi Örnekleri
-
-### `multiple_choice` — Çoktan Seçmeli
-```sql
-INSERT INTO questions
-  (lesson_id, question_text, question_type, option_a, option_b, option_c, option_d, correct_answer)
-VALUES (
-  1,
-  'Osmanlı Devleti hangi yılda kuruldu?',
-  'multiple_choice',
-  '1071', '1299', '1453', '1326',
-  'B'
-);
+# production mode
+$ npm run start:prod
 ```
 
-### `matching` — Eşleştirme
-`extra_data` alanına JSON çift listesi yazılır; `option_*` ve `correct_answer` boş bırakılır:
-```sql
-INSERT INTO questions (lesson_id, question_text, question_type, extra_data)
-VALUES (
-  2,
-  'Padişahları tahta çıkış yıllarıyla eşleştir',
-  'matching',
-  '[{"left":"Osman Bey","right":"1299"},{"left":"Fatih Sultan Mehmet","right":"1451"}]'
-);
+## Run tests
+
+```bash
+# unit tests
+$ npm run test
+
+# e2e tests
+$ npm run test:e2e
+
+# test coverage
+$ npm run test:cov
 ```
 
-### `fill_blank` — Boşluk Doldurma
-`correct_answer` alanına beklenen metin yazılır:
-```sql
-INSERT INTO questions (lesson_id, question_text, question_type, correct_answer)
-VALUES (
-  3,
-  'Osmanlı Devleti''ni _____ kurmuştur.',
-  'fill_blank',
-  'Osman Bey'
-);
+## Deployment
+
+When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+
+If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+
+```bash
+$ npm install -g @nestjs/mau
+$ mau deploy
 ```
 
-### Bilgi Kartı (Info Card)
-`question_type = 'multiple_choice'` ama şık yok — uygulamada bilgi metni olarak gösterilir:
-```sql
-INSERT INTO questions (lesson_id, question_text, question_type)
-VALUES (
-  1,
-  '1299 yılında Osman Bey tarafından kurulan Osmanlı Devleti, küçük bir beylikten dünya imparatorluğuna dönüştü.',
-  'multiple_choice'
-);
-```
+With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
 
----
+## Resources
 
-## 🔗 İlgili Repolar
+Check out a few resources that may come in handy when working with NestJS:
 
-- **Mobil Uygulama:** [bymmetin/MobilUygulama](https://github.com/bymmetin/MobilUygulama)
-- **Supabase Projesi:** `gyucxqpvrczuqqqhtrkm.supabase.co`
+- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
+- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
+- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
+- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
+- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
+- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
+- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
+- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+
+## Support
+
+Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+
+## Stay in touch
+
+- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
+- Website - [https://nestjs.com](https://nestjs.com/)
+- Twitter - [@nestframework](https://twitter.com/nestframework)
+
+## License
+
+Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
