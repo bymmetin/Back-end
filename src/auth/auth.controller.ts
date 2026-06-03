@@ -1,48 +1,34 @@
 import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
-import { IsEmail, IsNotEmpty, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
+import { RegisterDto } from './dto/register.dto';
+import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-
-export class RegisterDto {
-  @IsNotEmpty()
-  username: string;
-
-  @IsEmail()
-  email: string;
-
-  @IsNotEmpty()
-  @MinLength(6)
-  password: string;
-}
-
-export class LoginDto {
-  @IsEmail()
-  email: string;
-
-  @IsNotEmpty()
-  password: string;
-}
 
 @Controller('auth')
 export class AuthController {
   constructor(private auth: AuthService) {}
 
+  // POST /auth/register — açık
   @Post('register')
   register(@Body() dto: RegisterDto) {
-    return this.auth.register(dto.email, dto.password, dto.username);
+    return this.auth.register(dto.username, dto.email, dto.password);
   }
 
+  // POST /auth/login — LocalAuthGuard (passport-local) validate'i tetikler
+  @UseGuards(LocalAuthGuard)
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.auth.login(dto.email, dto.password);
+  login(@Request() req: { user: { id: string; username: string; email: string } }) {
+    return this.auth.login(req.user);
   }
 
+  // GET /auth/profile — JwtAuthGuard korumalı
   @UseGuards(JwtAuthGuard)
   @Get('profile')
-  getProfile(@Request() req: { user: { userId: string; email: string } }) {
+  getProfile(@Request() req: { user: { userId: string } }) {
     return this.auth.getProfile(req.user.userId);
   }
 
+  // POST /auth/logout — JwtAuthGuard korumalı
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   logout(@Request() req: { user: { userId: string } }) {
