@@ -1,19 +1,23 @@
+// lessons.service.ts — Ders veri erişim katmanı.
+// find({ where: { topic_id }, order: ... }) → SELECT * FROM lessons WHERE topic_id = ? ORDER BY order_num ASC
+
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository }       from 'typeorm';
+import { Lesson }           from './lesson.entity';
 
 @Injectable()
 export class LessonsService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    @InjectRepository(Lesson)
+    private lessonsRepo: Repository<Lesson>,
+  ) {}
 
-  async getLessons(topicId: string) {
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('lessons')
-      .select('*')
-      .eq('topic_id', topicId)
-      .order('order_num', { ascending: true });
-
-    if (error) throw new Error(error.message);
-    return data;
+  // Belirtilen konuya ait dersleri order_num sırasıyla getir
+  async getLessons(topicId: number): Promise<Lesson[]> {
+    return this.lessonsRepo.find({
+      where: { topic_id: topicId },    // WHERE topic_id = ?
+      order: { order_num: 'ASC' },     // ORDER BY order_num ASC
+    });
   }
 }

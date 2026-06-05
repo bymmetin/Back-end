@@ -1,45 +1,80 @@
+// progress.service.ts — Kullanıcı ilerleme ve XP güncelleme.
+// nestjs_user_progress tablosu kullanılır — Supabase UUID tablosuyla çakışmaz.
+
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository }       from 'typeorm';
+import { UserProgress }     from './user-progress.entity';
+import { Player }           from '../players/player.entity';
 
 @Injectable()
 export class ProgressService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    @InjectRepository(UserProgress)
+    private progressRepo: Repository<UserProgress>,
+    @InjectRepository(Player)
+    private playersRepo: Repository<Player>,
+  ) {}
 
-  async getUserProgress(userId: string) {
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('user_progress')
-      .select('*, lessons(title, topic_id)')
-      .eq('user_id', userId);
-
-    if (error) throw new Error(error.message);
-    return data;
+  // Kullanıcının tüm ders ilerlemesini döner
+  async getUserProgress(playerId: number): Promise<UserProgress[]> {
+    try {
+      return await this.progressRepo.find({ where: { player_id: playerId } });
+    } catch {
+      return [];
+    }
   }
 
-  async saveProgress(userId: string, lessonId: string, score: number, xpEarned: number) {
-    const client = this.supabase.getClient();
+  // Ders bitince çağrılır: en yüksek skor korunur, XP birikmeli eklenir
+  async saveProgress(
+    playerId: number,
+    lessonId: number,
+    score: number,
+    xpEarned: number,
+    correctCount: number,
+    totalCount: number,
+    wrongQuestionIds: number[],
+  ): Promise<{ success: boolean }> {
+    try {
+      let progress = await this.progressRepo.findOne({
+        where: { player_id: playerId, lesson_id: lessonId },
+      });
 
-    const { error: upsertError } = await client
-      .from('user_progress')
-      .upsert(
-        { user_id: userId, lesson_id: lessonId, completed: true, score },
-        { onConflict: 'user_id,lesson_id' },
-      );
+      if (progress) {
+        if (score > progress.score) {
+          progress.score         = score;
+          progress.correct_count = correctCount;
+          progress.total_count   = totalCount;
+          progress.completed     = score >= 50;
+        }
+        progress.earned_xp         += xpEarned;
+        progress.wrong_question_ids = JSON.stringify(wrongQuestionIds);
+      } else {
+        progress = this.progressRepo.create({
+          player_id:          playerId,
+          lesson_id:          lessonId,
+          completed:          score >= 50,
+          score,
+          correct_count:      correctCount,
+          total_count:        totalCount,
+          earned_xp:          xpEarned,
+          wrong_question_ids: JSON.stringify(wrongQuestionIds),
+        });
+      }
 
-    if (upsertError) throw new Error(upsertError.message);
+      await this.progressRepo.save(progress);
 
-    const { data: profile } = await client
-      .from('profiles')
-      .select('xp')
-      .eq('id', userId)
-      .single();
+      // Oyuncunun toplam XP'sini güncelle
+      const player = await this.playersRepo.findOneBy({ id: playerId });
+      if (player) {
+        player.xp += xpEarned;
+        await this.playersRepo.save(player);
+      }
 
-    const currentXp = profile?.xp ?? 0;
-    await client
-      .from('profiles')
-      .update({ xp: currentXp + xpEarned })
-      .eq('id', userId);
-
-    return { success: true };
+      return { success: true };
+    } catch (e) {
+      console.warn('saveProgress hata:', e.message);
+      return { success: false };
+    }
   }
 }

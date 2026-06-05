@@ -1,19 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-@Injectable()
-export class SupabaseService {
-  private client: SupabaseClient;
-
-  constructor(private config: ConfigService) {
-    this.client = createClient(
-      this.config.get<string>('SUPABASE_URL')!,
-      this.config.get<string>('SUPABASE_KEY')!,
-    );
-  }
-
-  getClient(): SupabaseClient {
-    return this.client;
-  }
-}
+// supabase.service.ts — Bu servis artık kullanılmıyor.
+// Backend TypeORM + PostgreSQL direkt bağlantısı kullanıyor (app.module.ts).
+// Mobil uygulama Supabase SDK ile direkt bağlanmaya devam ediyor.
+// Bu dosya ileride silinecek.
