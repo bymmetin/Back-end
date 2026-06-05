@@ -1,133 +1,107 @@
+// auth.service.ts — Kayıt, giriş, token üretimi ve çıkış iş mantığı.
+//
+// @InjectRepository(Player): TypeORM repository'sini dependency injection ile alır.
+//   Repository<Player>: Player tablosunda CRUD işlemleri için TypeORM'un hazır sınıfı.
+//   findOneBy(), save(), update() gibi metodları kullanmamızı sağlar.
+//
+// bcrypt: şifre güvenliği için tek yönlü hash algoritması.
+//   hash(): kayıt sırasında şifreyi hashler — DB'e düz metin kaydedilmez.
+//   compare(): giriş sırasında girilen şifreyi hash ile karşılaştırır.
+//
+// JWT: kullanıcı kimliğini kanıtlayan imzalı token.
+//   access_token:  kısa ömürlü (1 saat) — API isteklerinde Authorization header'ında gönderilir.
+//   refresh_token: uzun ömürlü (7 gün)  — access_token yenileme için kullanılır.
+
 import {
-  ConflictException,
   Injectable,
-  InternalServerErrorException,
+  ConflictException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
-import { SupabaseService } from '../supabase/supabase.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository }       from 'typeorm';
+import { JwtService }       from '@nestjs/jwt';
+import { ConfigService }    from '@nestjs/config';
+import * as bcrypt          from 'bcrypt';
+import { Player }           from '../players/player.entity';
+import { RegisterDto }      from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private supabase: SupabaseService,
-    private jwt: JwtService,
-    private config: ConfigService,
+    // TypeORM repository — Player tablosunda sorgular bu nesne üzerinden yapılır
+    @InjectRepository(Player)
+    private playersRepo: Repository<Player>,
+    private jwtService:  JwtService,
+    private config:      ConfigService,
   ) {}
 
-  // ── Kayıt ────────────────────────────────────────────────
-  async register(username: string, email: string, password: string) {
-    const client = this.supabase.getClient();
+  // Yeni oyuncu kaydı.
+  // findOneBy(): tek satır arama — bulunamazsa null döner.
+  // playersRepo.create(): DTO'dan Player nesnesi oluşturur (DB'ye yazmaz).
+  // playersRepo.save(): Player nesnesini INSERT eder.
+  async register(dto: RegisterDto): Promise<Player> {
+    // Kullanıcı adı daha önce alındı mı?
+    const existing = await this.playersRepo.findOneBy({ username: dto.username });
+    if (existing) throw new ConflictException('Bu kullanıcı adı zaten alınmış');
 
-    // username çakışma kontrolü
-    const { data: existing } = await client
-      .from('profiles')
-      .select('id')
-      .eq('username', username)
-      .maybeSingle();
+    // Şifreyi bcrypt ile hashle (10 round önerilir — güvenlik/performans dengesi)
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
 
-    if (existing) {
-      throw new ConflictException('Bu kullanıcı adı zaten kullanılıyor');
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const { data, error } = await client
-      .from('profiles')
-      .insert({ username, email, password_hash: passwordHash, xp: 0, streak: 0 })
-      .select('id, username, email, xp, streak')
-      .single();
-
-    if (error) throw new InternalServerErrorException(error.message);
-
-    const tokens = this.generateTokens(data.id, data.username);
-
-    // refresh token'ı hashleyip kaydet
-    const refreshHash = await bcrypt.hash(tokens.refresh_token, 10);
-    await client
-      .from('profiles')
-      .update({ refresh_token_hash: refreshHash })
-      .eq('id', data.id);
-
-    return { ...tokens, user: { id: data.id, username: data.username, email: data.email } };
+    // Entity oluştur ve kaydet
+    const player = this.playersRepo.create({ ...dto, password: hashedPassword });
+    return this.playersRepo.save(player);
   }
 
-  // ── validatePlayer (LocalStrategy için) ─────────────────
-  async validatePlayer(username: string, password: string) {
-    const { data: profile, error } = await this.supabase
-      .getClient()
-      .from('profiles')
-      .select('id, username, email, password_hash, xp, streak')
-      .eq('username', username)
-      .maybeSingle();
+  // LocalStrategy'nin çağırdığı doğrulama metodu.
+  // Mobil uygulama email gönderdiği için hem username hem email ile arama yapılır.
+  // bcrypt.compare(): girilen şifreyi DB'deki hash ile karşılaştırır — hash'i çözmez.
+  // Geçersizse null döner → LocalStrategy 401 fırlatır.
+  async validatePlayer(usernameOrEmail: string, password: string): Promise<Player | null> {
+    // Önce username ile ara, bulamazsa email ile ara
+    let player = await this.playersRepo.findOneBy({ username: usernameOrEmail });
+    if (!player) {
+      player = await this.playersRepo.findOneBy({ email: usernameOrEmail });
+    }
+    if (!player) return null;
 
-    if (error || !profile) return null;
-
-    const isMatch = await bcrypt.compare(password, profile.password_hash ?? '');
+    const isMatch = await bcrypt.compare(password, player.password);
     if (!isMatch) return null;
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password_hash, ...result } = profile;
-    return result;
+    return player; // req.user'a atanır
   }
 
-  // ── Login (LocalAuthGuard validate'den sonra çağrılır) ──
-  async login(user: { id: string; username: string; email: string }) {
-    const tokens = this.generateTokens(user.id, user.username);
+  // Başarılı girişten sonra access + refresh token çifti üretir.
+  // Refresh token DB'ye hashlenmiş halde kaydedilir (ham token saklanmaz).
+  async login(player: Player) {
+    const payload = { sub: player.id, username: player.username, role: player.role };
 
-    // refresh token hashini kaydet
-    const refreshHash = await bcrypt.hash(tokens.refresh_token, 10);
-    await this.supabase
-      .getClient()
-      .from('profiles')
-      .update({ refresh_token_hash: refreshHash })
-      .eq('id', user.id);
+    // Access token — kısa ömürlü, API isteklerinde kullanılır
+    const accessToken = this.jwtService.sign(payload);
 
-    return { ...tokens, user };
-  }
-
-  // ── Profil ───────────────────────────────────────────────
-  async getProfile(userId: string) {
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('profiles')
-      .select('id, username, email, xp, streak')
-      .eq('id', userId)
-      .single();
-
-    if (error || !data) throw new UnauthorizedException('Profil bulunamadı');
-    return data;
-  }
-
-  // ── Logout ───────────────────────────────────────────────
-  async logout(userId: string) {
-    await this.supabase
-      .getClient()
-      .from('profiles')
-      .update({ refresh_token_hash: null })
-      .eq('id', userId);
-
-    return { success: true, message: 'Çıkış yapıldı' };
-  }
-
-  // ── Token üretici (private) ──────────────────────────────
-  private generateTokens(userId: string, username: string) {
-    const payload = { sub: userId, username };
-
+    // Refresh token — uzun ömürlü, yeni access token almak için
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const access_token = this.jwt.sign(payload, {
-      secret: this.config.get<string>('JWT_SECRET'),
-      expiresIn: this.config.get('JWT_EXPIRES_IN', '3600s') as any,
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const refresh_token = this.jwt.sign(payload, {
-      secret: this.config.get<string>('JWT_REFRESH_SECRET'),
+    const refreshToken = this.jwtService.sign(payload as any, {
+      secret:    this.config.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d') as any,
     });
 
-    return { access_token, refresh_token };
+    // Refresh token'ı hashleyip kaydet — DB ele geçirilse ham token kullanılamaz
+    const hashedRefresh = await bcrypt.hash(refreshToken, 10);
+    await this.playersRepo.update(player.id, { refreshToken: hashedRefresh });
+
+    return { accessToken, refreshToken, user: { id: player.id, username: player.username, role: player.role } };
+  }
+
+  // JWT doğrulandıktan sonra kullanıcı profilini döner
+  async getProfile(playerId: number): Promise<Player> {
+    const player = await this.playersRepo.findOneBy({ id: playerId });
+    if (!player) throw new UnauthorizedException('Oyuncu bulunamadı');
+    return player; // @Exclude() sayesinde password ve refreshToken JSON'a girmez
+  }
+
+  // Oturumu kapatır: refresh token'ı null yapar → geçersiz kalır
+  async logout(playerId: number): Promise<{ message: string }> {
+    await this.playersRepo.update(playerId, { refreshToken: undefined });
+    return { message: 'Çıkış yapıldı' };
   }
 }

@@ -1,9 +1,4 @@
-import { Global, Module } from '@nestjs/common';
-import { SupabaseService } from './supabase.service';
-
-@Global()
-@Module({
-  providers: [SupabaseService],
-  exports: [SupabaseService],
-})
-export class SupabaseModule {}
+// supabase.module.ts — Bu modül artık kullanılmıyor.
+// Backend TypeORM + PostgreSQL direkt bağlantısı kullanıyor (app.module.ts).
+// Mobil uygulama Supabase SDK ile direkt bağlanmaya devam ediyor.
+// Bu dosya ileride silinecek.
